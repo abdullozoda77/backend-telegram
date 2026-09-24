@@ -3,8 +3,9 @@ from django.db import models
 from django.utils import timezone
 
 class CustomUser(AbstractUser):
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+    is_online = models.BooleanField(default=False)
     phone_number = models.CharField(max_length=20, unique=True, blank=True, null=True)
-
 
 class PhoneOTP(models.Model):
     phone_number = models.CharField(max_length=20)

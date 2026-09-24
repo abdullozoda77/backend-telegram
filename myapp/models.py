@@ -1,118 +1,121 @@
-from datetime import timedelta
 from django.conf import settings
 from django.db import models
-from django.utils import timezone
 
-
-class Account(models.Model):
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="account")
-    fname = models.CharField(max_length=150)
-    lname = models.CharField(max_length=150)
-    passport_id = models.CharField(max_length=50)
-    balance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+class Chat(models.Model):
+    CHAT_TYPES = (("private", "Private"),("group", "Group"),("channel", "Channel"),)
+    chat_type = models.CharField(max_length=20,choices=CHAT_TYPES)
+    title = models.CharField(max_length=255,blank=True)
+    photo = models.ImageField(upload_to="chat_photos/",blank=True,null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.fname} {self.lname}"
+        return self.title
 
+class ChatMember(models.Model):
+    chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name="members")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="chats")
+    is_admin = models.BooleanField(default=False)
+    joined_at = models.DateTimeField(auto_now_add=True)
 
-def default_expair():
-    return timezone.now() + timedelta(days=365 * 5)
+    def __str__(self):
+        return f"{self.user} in {self.chat}"
 
-
-class Card(models.Model):
-    CARD_TYPES = (
-        ("visa", "Visa"),
-        ("credit", "Credit"),
-        ("master", "Master"),
-        ("simple", "Simple"),
+class Message(models.Model):
+    MESSAGE_TYPES = (
+        ("text", "Text"),
+        ("image", "Image"),
+        ("video", "Video"),
+        ("audio", "Audio"),
+        ("file", "File"),
     )
-    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="cards")
-    card_id = models.CharField(max_length=16, unique=True)
-    balance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    cart_name = models.CharField(max_length=20, choices=CARD_TYPES)
-    cvv = models.CharField(max_length=3)
+    chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name="messages")
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_messages")
+    message_type = models.CharField(max_length=20, choices=MESSAGE_TYPES, default="text")
+    text = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    expair = models.DateTimeField(default=default_expair)
+    is_edited = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
 
     def __str__(self):
-        return self.card_id
+        return f"{self.sender}"
 
-
-class Transaction(models.Model):
-    TRANSFER_TYPES = (("phone_num", "Phone Number"), ("card", "Card"))
-    STATUS_CHOICES = (("pending", "Pending"), ("completed", "Completed"), ("failed", "Failed"))
-
-    type = models.CharField(max_length=20, choices=TRANSFER_TYPES)
-    sender = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="sent_transactions")
-    reciver = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="received_transactions")
-    amount = models.DecimalField(max_digits=14, decimal_places=2)
+class Media(models.Model):
+    MEDIA_TYPES = (("image", "Image"), ("video", "Video"), ("file", "File"), ("audio", "Audio"),)
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="media")
+    media_type = models.CharField(max_length=20, choices=MEDIA_TYPES)
+    file = models.FileField(upload_to="message_media/")
     created_at = models.DateTimeField(auto_now_add=True)
-    cuur_balance_sender = models.DecimalField(max_digits=14, decimal_places=2)
-    cuur_balance_reciver = models.DecimalField(max_digits=14, decimal_places=2)
-    description = models.CharField(max_length=255, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="completed")
 
     def __str__(self):
-        return f"{self.sender} -> {self.reciver}: {self.amount}"
+        return f"{self.message}"
 
-
-class TransactionInside(models.Model):
-    TRANSFER_TYPES = (("phone_num", "Phone Number"), ("card", "Card"))
-    STATUS_CHOICES = (("pending", "Pending"), ("completed", "Completed"), ("failed", "Failed"))
-
-    type = models.CharField(max_length=20, choices=TRANSFER_TYPES)
-    sender = models.CharField(max_length=20)
-    reciver = models.CharField(max_length=20)
-    amount = models.DecimalField(max_digits=14, decimal_places=2)
+class Group(models.Model):
+    chat = models.OneToOneField(Chat, on_delete=models.CASCADE, related_name="group")
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    photo = models.ImageField(upload_to="group_photos/", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    cuur_balance_sender = models.DecimalField(max_digits=14, decimal_places=2)
-    cuur_balance_reciver = models.DecimalField(max_digits=14, decimal_places=2)
-    description = models.CharField(max_length=255, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="completed")
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.sender} -> {self.reciver}: {self.amount}"
+        return self.name
 
-
-class GetCredit(models.Model):
-    STATUS_CHOICES = (("pending", "Pending"), ("approved", "Approved"), ("rejected", "Rejected"))
-
-    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name="credits")
-    amount = models.DecimalField(max_digits=14, decimal_places=2)
+class Channel(models.Model):
+    chat = models.OneToOneField(Chat, on_delete=models.CASCADE, related_name="channel")
+    name = models.CharField(max_length=255)
+    username = models.CharField(max_length=255, unique=True, blank=True, null=True)
+    description = models.TextField(blank=True)
+    photo = models.ImageField(upload_to="channel_photos/", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    procent = models.DecimalField(max_digits=5, decimal_places=2)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="approved")
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Credit {self.amount} for {self.card}"
+        return self.name
 
-
-class PutDeposit(models.Model):
-    STATUS_CHOICES = (("pending", "Pending"), ("completed", "Completed"), ("failed", "Failed"))
-
-    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name="deposits")
-    amount = models.DecimalField(max_digits=14, decimal_places=2)
+class Notification(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="notifications", null=True, blank=True)
+    notification_type = models.CharField(max_length=50)
+    text = models.CharField(max_length=255)
+    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    procent = models.DecimalField(max_digits=5, decimal_places=2)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="completed")
 
     def __str__(self):
-        return f"Deposit {self.amount} for {self.card}"
+        return f"{self.notification_type} for {self.user}"
 
-
-class AccountBlackList(models.Model):
-    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="blacklist_entries")
+class Contact(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="contacts")
+    contact_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="added_by")
+    nickname = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    description = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
-        return f"Blacklisted account {self.account}"
+        return self.nickname
 
-
-class CardBlackList(models.Model):
-    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name="blacklist_entries")
+class Block(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="blocked_users")
+    blocked_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="blocked_by")
     created_at = models.DateTimeField(auto_now_add=True)
-    description = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
-        return f"Blacklisted card {self.card}"
+        return f"{self.user} blocked {self.blocked_user}"
+
+class Story(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="stories")
+    media = models.FileField(upload_to="stories/")
+    caption = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Story by {self.user}"
+
+class StoryView(models.Model):
+    story = models.ForeignKey(Story, on_delete=models.CASCADE, related_name="views")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="story_views")
+    viewed_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user} viewed {self.story}"
