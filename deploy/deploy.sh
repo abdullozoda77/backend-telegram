@@ -27,7 +27,8 @@ fi
 
 echo "==> Installing system packages"
 sudo apt update
-sudo apt install -y python3-venv python3-pip nginx
+sudo apt install -y python3-venv python3-pip nginx redis-server
+sudo systemctl enable --now redis-server
 
 echo "==> Virtualenv + requirements"
 cd "$PROJECT_DIR"
